@@ -1,0 +1,60 @@
+.foo {
+  color: red;
+}
+
+.foo .bar {
+  --x: 0;
+}
+
+.foo,
+.bar,
+.baz {
+  --x: 0;
+}
+
+.foo :global(.bar) {
+  --x: 0;
+}
+
+.foo :global .bar {
+  --x: 0;
+}
+
+.foo :is(:global(.bar), .baz) {
+  --x: 0;
+}
+
+:global .bar :local .foo {
+  --x: 0;
+}
+
+:where(.foo, :global(.bar)) .foo {
+  --x: 0;
+}
+
+@keyframes foo {
+}
+
+.foo {
+  animation: 1s cubic-bezier(0, 0, 0, 0) infinite foobar-animation,
+    2s infinite infinite;
+}
+
+@keyframes :global(bar) {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.foo :global {
+  animation: 1s infinite bar;
+}
+
+@media screen and (max-width: 1280px) {
+  .foo :global .bar {
+    width: 100%;
+  }
+}

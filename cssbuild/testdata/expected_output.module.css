@@ -1,0 +1,60 @@
+.foo__SUFFIX__ {
+  color: red;
+}
+
+.foo__SUFFIX__ .bar__SUFFIX__ {
+  --x: 0;
+}
+
+.foo__SUFFIX__,
+.bar__SUFFIX__,
+.baz__SUFFIX__ {
+  --x: 0;
+}
+
+.foo__SUFFIX__ .bar {
+  --x: 0;
+}
+
+.foo__SUFFIX__ .bar {
+  --x: 0;
+}
+
+.foo__SUFFIX__ :is(.bar, .baz__SUFFIX__) {
+  --x: 0;
+}
+
+.bar .foo__SUFFIX__ {
+  --x: 0;
+}
+
+:where(.foo__SUFFIX__, .bar) .foo__SUFFIX__ {
+  --x: 0;
+}
+
+@keyframes foo__SUFFIX__ {
+}
+
+.foo__SUFFIX__ {
+  animation: 1s cubic-bezier(0, 0, 0, 0) infinite foobar-animation__SUFFIX__,
+    2s infinite infinite__SUFFIX__;
+}
+
+@keyframes bar {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.foo__SUFFIX__ {
+  animation: 1s infinite bar;
+}
+
+@media screen and (max-width: 1280px) {
+  .foo__SUFFIX__ .bar {
+    width: 100%;
+  }
+}
