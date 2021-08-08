@@ -22,6 +22,7 @@ func TestTransform(t *testing.T) {
 	err := Transform(strings.NewReader(input), &actual, &TransformOpts{
 		Suffix:              []byte("__SUFFIX__"),
 		JSWriter:            &actualJS,
+		JSModuleName:        "cssbuild/cssbuild/testdata/expected_output.module.css",
 		TSDeclarationWriter: &actualTS,
 		CamelCaseJSKeys:     true,
 	})
@@ -62,7 +63,9 @@ func formatCSS(t *testing.T, css string) string {
 	cmd := exec.Command("prettier", "--parser", "css")
 	cmd.Stdin = strings.NewReader(css)
 	b, err := cmd.CombinedOutput()
-	checkErr(t, err)
+	if err, ok := err.(*exec.ExitError); ok {
+		t.Fatalf("prettier failed (%s)\n%s", err, string(b))
+	}
 	return string(b)
 }
 

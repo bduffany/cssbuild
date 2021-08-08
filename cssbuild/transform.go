@@ -22,10 +22,29 @@ const (
 	randSuffixLength = 8
 	randSuffixChars  = "abcdefghijklmnopqrstuvwxyz0123456789"
 
-	tsDeclarationContents = `export declare const classNames: Record<string, string>;
+	jsHeaderTemplate = `(function (factory) {
+  if (typeof module === 'object' && typeof module.exports === 'object') {
+    var v = factory(require, exports);
+    if (v !== undefined) module.exports = v;
+  } else if (typeof define === 'function' && define.amd) {
+    define('%s', [
+      'require',
+      'exports',
+    ], factory);
+  }
+})(function (require, exports) {
+  'use strict';
+  Object.defineProperty(exports, '__esModule', { value: true });
+  exports.animationNames = exports.classNames = void 0;
+`
 
+	jsFooterTemplate = `  exports.default = exports.classNames;
+});
+`
+
+	tsDeclarationTemplate = `/// <amd-module name="%s" />
+export declare const classNames: Record<string, string>;
 export declare const animationNames: Record<string, string>;
-
 export default classNames;
 `
 )
@@ -43,13 +62,16 @@ type jsMappings struct {
 }
 
 func (m *jsMappings) Write(w io.Writer, opts *TransformOpts) error {
+	if _, err := io.WriteString(w, fmt.Sprintf(jsHeaderTemplate, opts.JSModuleName)); err != nil {
+		return err
+	}
 	if err := writeExportedJSMap(w, opts, "classNames", m.ClassNames); err != nil {
 		return err
 	}
 	if err := writeExportedJSMap(w, opts, "animationNames", m.AnimationNames); err != nil {
 		return err
 	}
-	if _, err := io.WriteString(w, "export default classNames;\n"); err != nil {
+	if _, err := io.WriteString(w, jsFooterTemplate); err != nil {
 		return err
 	}
 
@@ -63,7 +85,7 @@ func writeExportedJSMap(w io.Writer, opts *TransformOpts, varName string, mappin
 		}
 	}
 	classes := sortedKeys(mapping)
-	if _, err := io.WriteString(w, fmt.Sprintf("export const %s = {\n", varName)); err != nil {
+	if _, err := io.WriteString(w, fmt.Sprintf("  exports.%s = {\n", varName)); err != nil {
 		return err
 	}
 	for _, c := range classes {
@@ -72,11 +94,11 @@ func writeExportedJSMap(w io.Writer, opts *TransformOpts, varName string, mappin
 			key = kebabToCamel(key)
 		}
 		value := c + string(opts.Suffix)
-		if _, err := io.WriteString(w, fmt.Sprintf("  %s: '%s',\n", toJSKeyGrammar(key), value)); err != nil {
+		if _, err := io.WriteString(w, fmt.Sprintf("    %s: '%s',\n", toJSKeyGrammar(key), value)); err != nil {
 			return err
 		}
 	}
-	if _, err := io.WriteString(w, "};\n\n"); err != nil {
+	if _, err := io.WriteString(w, "  };\n"); err != nil {
 		return err
 	}
 	return nil
@@ -141,6 +163,9 @@ type TransformOpts struct {
 	// CSS identifiers to suffixed ones.
 	JSWriter io.Writer
 
+	// JSModuleName is the module name of the generated UMD module.
+	JSModuleName string
+
 	// TSDeclarationWriter is an optional writer for writing TS declarations
 	// for the written JS module.
 	TSDeclarationWriter io.Writer
@@ -203,7 +228,8 @@ func Transform(r io.Reader, w io.Writer, opts *TransformOpts) error {
 				}
 			}
 			if opts.TSDeclarationWriter != nil {
-				if _, err := io.WriteString(opts.TSDeclarationWriter, tsDeclarationContents); err != nil {
+				d := fmt.Sprintf(tsDeclarationTemplate, opts.JSModuleName)
+				if _, err := io.WriteString(opts.TSDeclarationWriter, d); err != nil {
 					return err
 				}
 			}

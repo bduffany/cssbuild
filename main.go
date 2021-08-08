@@ -15,6 +15,7 @@ var (
 	inputPath  = flag.String("in", "", "Input file path")
 	outputPath = flag.String("out", "", "Output file path")
 
+	jsModuleName      = flag.String("js_module_name", "", "JS module name. Required.")
 	jsOutputPath      = flag.String("js_out", "", "JS mapping output path. By default, it will be placed next to the output file, with the same basename as the input path.")
 	tsDeclarationPath = flag.String("ts_out", "", "TS declaration output path (*.d.ts). By default, it will be the same as the JS output path, with the \".js\" suffix replaced by \".d.ts\"")
 	camelCaseJSKeys   = flag.Bool("camel_case_js_keys", false, "Whether to convert kebab-case class names in the stylesheet to camelCase in the generated JS.")
@@ -56,6 +57,7 @@ func main() {
 	opts := &cssbuild.TransformOpts{
 		JSWriter:            js,
 		TSDeclarationWriter: ts,
+		JSModuleName:        *jsModuleName,
 		CamelCaseJSKeys:     *camelCaseJSKeys,
 	}
 	if err := cssbuild.Transform(in, out, opts); err != nil {
@@ -65,10 +67,13 @@ func main() {
 
 func validateFlags() error {
 	if *inputPath == "" {
-		return fmt.Errorf("missing input path argument")
+		return fmt.Errorf("missing input CSS module path (`-in` flag)")
 	}
 	if *outputPath == "" {
-		return fmt.Errorf("missing --out path")
+		return fmt.Errorf("missing output CSS path (`-out` flag)")
+	}
+	if *jsModuleName == "" {
+		return fmt.Errorf("missing JS module name (`-js_module_name` flag)")
 	}
 	return nil
 }
