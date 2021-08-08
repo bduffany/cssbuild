@@ -12,6 +12,10 @@
   --x: 0;
 }
 
+:not(.foo__SUFFIX__) {
+  --x: 0;
+}
+
 .foo__SUFFIX__ ~ div,
 .foo__SUFFIX__ + #id,
 .foo__SUFFIX__ > [data-some-attr^='.do-not-touch'] {
