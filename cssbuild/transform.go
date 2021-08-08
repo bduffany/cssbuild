@@ -21,6 +21,13 @@ const (
 
 	randSuffixLength = 8
 	randSuffixChars  = "abcdefghijklmnopqrstuvwxyz0123456789"
+
+	tsDeclarationContents = `export declare const classNames: Record<string, string>;
+
+export declare const animationNames: Record<string, string>;
+
+export default classNames;
+`
 )
 
 type scopeType int
@@ -134,6 +141,10 @@ type TransformOpts struct {
 	// CSS identifiers to suffixed ones.
 	JSWriter io.Writer
 
+	// TSDeclarationWriter is an optional writer for writing TS declarations
+	// for the written JS module.
+	TSDeclarationWriter io.Writer
+
 	// Suffix is the suffix to append to all locally scoped identifiers
 	// in the transformed stylesheet. If empty, it will be set to an underscore
 	// followed by a randomly generated string.
@@ -188,6 +199,11 @@ func Transform(r io.Reader, w io.Writer, opts *TransformOpts) error {
 			// Write mappings file before returning.
 			if opts.JSWriter != nil {
 				if err := js.Write(opts.JSWriter, opts); err != nil {
+					return err
+				}
+			}
+			if opts.TSDeclarationWriter != nil {
+				if _, err := io.WriteString(opts.TSDeclarationWriter, tsDeclarationContents); err != nil {
 					return err
 				}
 			}

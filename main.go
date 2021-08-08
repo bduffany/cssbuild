@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/bduffany/cssbuild/cssbuild"
 )
@@ -14,8 +15,9 @@ var (
 	inputPath  = flag.String("in", "", "Input file path")
 	outputPath = flag.String("out", "", "Output file path")
 
-	jsOutputPath    = flag.String("js_out", "", "JS mapping output path. By default, it will be placed next to the output file, with the same basename as the input path.")
-	camelCaseJSKeys = flag.Bool("camel_case_js_keys", false, "Whether to convert kebab-case class names in the stylesheet to camelCase in the generated JS.")
+	jsOutputPath      = flag.String("js_out", "", "JS mapping output path. By default, it will be placed next to the output file, with the same basename as the input path.")
+	tsDeclarationPath = flag.String("ts_out", "", "TS declaration output path (*.d.ts). By default, it will be the same as the JS output path, with the \".js\" suffix replaced by \".d.ts\"")
+	camelCaseJSKeys   = flag.Bool("camel_case_js_keys", false, "Whether to convert kebab-case class names in the stylesheet to camelCase in the generated JS.")
 )
 
 func main() {
@@ -43,9 +45,18 @@ func main() {
 	if err != nil {
 		fatal(err)
 	}
+	tsPath := *tsDeclarationPath
+	if tsPath == "" {
+		tsPath = strings.TrimSuffix(jsPath, ".js") + ".d.ts"
+	}
+	ts, err := os.Create(tsPath)
+	if err != nil {
+		fatal(err)
+	}
 	opts := &cssbuild.TransformOpts{
-		JSWriter:        js,
-		CamelCaseJSKeys: *camelCaseJSKeys,
+		JSWriter:            js,
+		TSDeclarationWriter: ts,
+		CamelCaseJSKeys:     *camelCaseJSKeys,
 	}
 	if err := cssbuild.Transform(in, out, opts); err != nil {
 		fatal(err)

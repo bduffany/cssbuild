@@ -14,18 +14,22 @@ func TestTransform(t *testing.T) {
 	input := readFileAsString(t, "testdata/input.module.css")
 	expected := readFileAsString(t, "testdata/expected_output.module.css")
 	expectedJS := readFileAsString(t, "testdata/expected_output.module.css.js")
+	expectedTS := readFileAsString(t, "testdata/expected_output.module.css.d.ts")
 	var actual bytes.Buffer
 	var actualJS bytes.Buffer
+	var actualTS bytes.Buffer
 
 	err := Transform(strings.NewReader(input), &actual, &TransformOpts{
-		Suffix:          []byte("__SUFFIX__"),
-		JSWriter:        &actualJS,
-		CamelCaseJSKeys: true,
+		Suffix:              []byte("__SUFFIX__"),
+		JSWriter:            &actualJS,
+		TSDeclarationWriter: &actualTS,
+		CamelCaseJSKeys:     true,
 	})
 
 	checkErr(t, err)
 	checkDiff(t, expected, formatCSS(t, actual.String()))
 	checkDiff(t, expectedJS, actualJS.String())
+	checkDiff(t, expectedTS, actualTS.String())
 }
 
 func readFileAsString(t *testing.T, path string) string {
