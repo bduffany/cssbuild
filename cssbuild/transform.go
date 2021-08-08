@@ -227,9 +227,11 @@ func Transform(r io.Reader, w io.Writer, opts *TransformOpts) error {
 				buf = append(buf, ':', ' ')
 			}
 
-			if gt == css.DeclarationGrammar && (string(text) == "animation" || string(text) == "-webkit-animation") {
+			textStr := string(text)
+
+			if gt == css.DeclarationGrammar && (textStr == "animation" || textStr == "-webkit-animation" || textStr == "-moz-animation") {
 				buf = append(buf, transformAnimationProperty(values, blockScope, opts)...)
-			} else if gt == css.DeclarationGrammar && (string(text) == "animation-name" || string(text) == "-webkit-animation-name") {
+			} else if gt == css.DeclarationGrammar && (textStr == "animation-name" || textStr == "-webkit-animation-name" || textStr == "-moz-animation-name") {
 				buf = append(buf, transformAnimationNameProperty(values, blockScope, opts)...)
 			} else if gt != css.EndAtRuleGrammar && gt != css.EndRulesetGrammar {
 				for _, val := range p.Values() {
@@ -374,7 +376,8 @@ func transformSelector(text []byte, values []css.Token, opts *TransformOpts, js 
 
 func transformAtRule(text []byte, values []css.Token, opts *TransformOpts, js *jsMappings) (buf []byte) {
 	buf = append(buf, text...)
-	if string(text) == "@keyframes" {
+	textStr := string(text)
+	if textStr == "@keyframes" || textStr == "@-webkit-keyframes" || textStr == "@-moz-keyframes" {
 		// When using @keyframes :global, this confuses the parser and it doesn't
 		// add whitespace after @keyframes. Add it here.
 		if len(values) > 0 && values[0].TokenType != css.WhitespaceToken {

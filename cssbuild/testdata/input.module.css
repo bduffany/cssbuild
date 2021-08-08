@@ -35,10 +35,23 @@
 @keyframes foo {
 }
 
+@-webkit-keyframes foo {
+}
+
+@-moz-keyframes foo {
+}
+
 .foo {
   animation: 1s cubic-bezier(0, 0, 0, 0) infinite foobar-animation,
     2s infinite infinite;
   -webkit-animation: 1s infinite foobar-animation;
+  -moz-animation: 1s infinite foobar-animation;
+}
+
+.foo {
+  animation-name: foo, bar;
+  -webkit-animation-name: foo, bar;
+  -moz-animation-name: foo, bar;
 }
 
 @keyframes :global(bar) {
