@@ -38,6 +38,7 @@
 .foo {
   animation: 1s cubic-bezier(0, 0, 0, 0) infinite foobar-animation,
     2s infinite infinite;
+  -webkit-animation: 1s infinite foobar-animation;
 }
 
 @keyframes :global(bar) {

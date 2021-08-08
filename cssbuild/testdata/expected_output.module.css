@@ -38,6 +38,7 @@
 .foo__SUFFIX__ {
   animation: 1s cubic-bezier(0, 0, 0, 0) infinite foobar-animation__SUFFIX__,
     2s infinite infinite__SUFFIX__;
+  -webkit-animation: 1s infinite foobar-animation__SUFFIX__;
 }
 
 @keyframes bar {
