@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/bduffany/cssbuild/cssbuild/css"
@@ -23,8 +25,124 @@ const (
 
 type scopeType int
 
+type jsMappings struct {
+	// ClassNames is the set of locally scoped class name identifiers discovered
+	// in the input stylesheet.
+	ClassNames map[string]struct{}
+
+	// AnimationNames is the set of locally scoped animation name identifiers
+	// discovered in the input stylesheet.
+	AnimationNames map[string]struct{}
+}
+
+func (m *jsMappings) Write(w io.Writer, opts *TransformOpts) error {
+	if err := writeExportedJSMap(w, opts, "classNames", m.ClassNames); err != nil {
+		return err
+	}
+	if err := writeExportedJSMap(w, opts, "animationNames", m.AnimationNames); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, "export default classNames;\n"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func writeExportedJSMap(w io.Writer, opts *TransformOpts, varName string, mapping map[string]struct{}) error {
+	if opts.CamelCaseJSKeys {
+		if err := checkForConflicts(mapping); err != nil {
+			return err
+		}
+	}
+	classes := sortedKeys(mapping)
+	if _, err := io.WriteString(w, fmt.Sprintf("export const %s = {\n", varName)); err != nil {
+		return err
+	}
+	for _, c := range classes {
+		key := c
+		if opts.CamelCaseJSKeys {
+			key = kebabToCamel(key)
+		}
+		value := c + string(opts.Suffix)
+		if _, err := io.WriteString(w, fmt.Sprintf("  %s: '%s',\n", toJSKeyGrammar(key), value)); err != nil {
+			return err
+		}
+	}
+	if _, err := io.WriteString(w, "};\n\n"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func checkForConflicts(mapping map[string]struct{}) error {
+	camelToOriginal := map[string]string{}
+	for k := range mapping {
+		camel := kebabToCamel(k)
+		if conflict := camelToOriginal[camel]; conflict != "" {
+			return fmt.Errorf("class names %q and %q have the same map key representation; rename to avoid conflict", k, conflict)
+		}
+		camelToOriginal[camel] = k
+	}
+	return nil
+}
+
+func sortedKeys(set map[string]struct{}) []string {
+	keys := []string{}
+	for k, _ := range set {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func kebabToCamel(val string) string {
+	tokens := strings.Split(val, "-")
+	out := ""
+	if len(tokens) == 0 {
+		return out
+	}
+	out += strings.ToLower(tokens[0])
+	rest := tokens[1:]
+	if len(rest) == 0 {
+		return out
+	}
+	for _, token := range rest {
+		if len(token) == 0 {
+			continue
+		}
+		out += strings.ToUpper(token[:1])
+		rest := token[1:]
+		if len(rest) == 0 {
+			continue
+		}
+		out += strings.ToLower(rest)
+	}
+	return out
+}
+
+func toJSKeyGrammar(key string) string {
+	if strings.Contains(key, "-") {
+		return `"` + key + `"`
+	}
+	return key
+}
+
+// TransformOpts specifies options for the CSS module transform.
 type TransformOpts struct {
+	// JSWriter is an optional writer for writing JS mappings from the original
+	// CSS identifiers to suffixed ones.
+	JSWriter io.Writer
+
+	// Suffix is the suffix to append to all locally scoped identifiers
+	// in the transformed stylesheet. If empty, it will be set to an underscore
+	// followed by a randomly generated string.
 	Suffix []byte
+
+	// CamelCaseJSKeys specifies whether to convert kebab-case to camelCase for
+	// keys in the generated JS mappings. For example, the class name "foo-bar"
+	// would be accessed in JS as "fooBar".
+	CamelCaseJSKeys bool
 }
 
 // Transform reads a module stylesheet from the given reader, and writes the
@@ -36,18 +154,23 @@ func Transform(r io.Reader, w io.Writer, opts *TransformOpts) error {
 	}
 
 	{
+		// Copy opts to avoid mutation.
 		optsCopy := *opts
 		opts = &optsCopy
 	}
 	if len(opts.Suffix) == 0 {
-		opts.Suffix = RandomSuffix()
+		opts.Suffix = randomSuffix()
 	}
 
 	p := css.NewParser(parse.NewInput(r), false /*=inline*/)
 
-	var buf []byte
-	var indent []byte
 	blockScope := local
+	buf := []byte{}
+	indent := []byte{}
+	js := &jsMappings{
+		ClassNames:     map[string]struct{}{},
+		AnimationNames: map[string]struct{}{},
+	}
 	for {
 		// Consume the next token.
 		gt, tt, text := p.Next()
@@ -62,6 +185,12 @@ func Transform(r io.Reader, w io.Writer, opts *TransformOpts) error {
 			if len(buf) > 0 {
 				return fmt.Errorf("unexpected: unflushed contents %q when seeing EOF", string(buf))
 			}
+			// Write mappings file before returning.
+			if opts.JSWriter != nil {
+				if err := js.Write(opts.JSWriter, opts); err != nil {
+					return err
+				}
+			}
 			return nil
 		}
 		// Return non-EOF errors immediately.
@@ -73,7 +202,7 @@ func Transform(r io.Reader, w io.Writer, opts *TransformOpts) error {
 		}
 
 		if gt == css.QualifiedRuleGrammar || gt == css.BeginRulesetGrammar {
-			b, endScope := transformSelector(text, values, opts)
+			b, endScope := transformSelector(text, values, opts, js)
 			buf = append(buf, b...)
 			blockScope = endScope
 			if gt == css.BeginRulesetGrammar {
@@ -86,7 +215,7 @@ func Transform(r io.Reader, w io.Writer, opts *TransformOpts) error {
 				buf = append(buf, ',')
 			}
 		} else if gt == css.BeginAtRuleGrammar {
-			buf = append(buf, transformAtRule(text, values, opts)...)
+			buf = append(buf, transformAtRule(text, values, opts, js)...)
 			buf = append(buf, ' ', '{')
 		} else {
 			if gt == css.CustomPropertyGrammar {
@@ -157,7 +286,9 @@ func Transform(r io.Reader, w io.Writer, opts *TransformOpts) error {
 	}
 }
 
-func RandomSuffix() []byte {
+// randomSuffix returns a random suffix to be appended to class name
+// identifiers.
+func randomSuffix() []byte {
 	out := []byte{'_'}
 	s := rand.NewSource(int64(time.Now().UnixNano()))
 	r := rand.New(s)
@@ -168,7 +299,7 @@ func RandomSuffix() []byte {
 	return out
 }
 
-func transformSelector(text []byte, values []css.Token, opts *TransformOpts) (buf []byte, endScope scopeType) {
+func transformSelector(text []byte, values []css.Token, opts *TransformOpts, js *jsMappings) (buf []byte, endScope scopeType) {
 	scopeMode := local
 	scopeStack := []scopeType{}
 
@@ -231,6 +362,7 @@ func transformSelector(text []byte, values []css.Token, opts *TransformOpts) (bu
 			}
 			if isClassName && scope == local {
 				buf = append(buf, opts.Suffix...)
+				js.ClassNames[string(val.Data)] = struct{}{}
 			}
 		} else {
 			skip--
@@ -240,7 +372,7 @@ func transformSelector(text []byte, values []css.Token, opts *TransformOpts) (bu
 	return buf, scopeMode
 }
 
-func transformAtRule(text []byte, values []css.Token, opts *TransformOpts) (buf []byte) {
+func transformAtRule(text []byte, values []css.Token, opts *TransformOpts, js *jsMappings) (buf []byte) {
 	buf = append(buf, text...)
 	if string(text) == "@keyframes" {
 		// When using @keyframes :global, this confuses the parser and it doesn't
@@ -262,6 +394,7 @@ func transformAtRule(text []byte, values []css.Token, opts *TransformOpts) (buf 
 			}
 			if val.TokenType == css.IdentToken && scope != global {
 				buf = append(buf, opts.Suffix...)
+				js.AnimationNames[string(val.Data)] = struct{}{}
 			}
 		}
 	} else {

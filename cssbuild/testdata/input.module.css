@@ -2,7 +2,7 @@
   color: red;
 }
 
-.foo .bar {
+.foo .bar .foo-bar {
   --x: 0;
 }
 

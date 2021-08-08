@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 
 	"github.com/bduffany/cssbuild/cssbuild"
 )
@@ -12,47 +13,53 @@ import (
 var (
 	inputPath  = flag.String("in", "", "Input file path")
 	outputPath = flag.String("out", "", "Output file path")
-)
 
-type Opts struct {
-	InputPath  string
-	OutputPath string
-}
+	jsOutputPath    = flag.String("js_out", "", "JS mapping output path. By default, it will be placed next to the output file, with the same basename as the input path.")
+	camelCaseJSKeys = flag.Bool("camel_case_js_keys", false, "Whether to convert kebab-case class names in the stylesheet to camelCase in the generated JS.")
+)
 
 func main() {
 	flag.Parse()
-	opts, err := getOpts()
-	if err != nil {
+	if err := validateFlags(); err != nil {
 		io.WriteString(os.Stderr, fmt.Sprintf("%s\n", err))
 		flag.Usage()
 		os.Exit(1)
 	}
-
-	in, err := os.Open(opts.InputPath)
+	in, err := os.Open(*inputPath)
 	if err != nil {
 		fatal(err)
 	}
-	out, err := os.Create(opts.OutputPath)
+	out, err := os.Create(*outputPath)
 	if err != nil {
 		fatal(err)
 	}
-
-	if err := cssbuild.Transform(in, out, &cssbuild.TransformOpts{}); err != nil {
+	jsPath := *jsOutputPath
+	if jsPath == "" {
+		jsOutDir := path.Dir(*outputPath)
+		inputCSSBase := path.Base(*inputPath)
+		jsPath = path.Join(jsOutDir, inputCSSBase+".js")
+	}
+	js, err := os.Create(jsPath)
+	if err != nil {
+		fatal(err)
+	}
+	opts := &cssbuild.TransformOpts{
+		JSWriter:        js,
+		CamelCaseJSKeys: *camelCaseJSKeys,
+	}
+	if err := cssbuild.Transform(in, out, opts); err != nil {
 		fatal(err)
 	}
 }
 
-func getOpts() (*Opts, error) {
+func validateFlags() error {
 	if *inputPath == "" {
-		return nil, fmt.Errorf("missing input path argument")
+		return fmt.Errorf("missing input path argument")
 	}
 	if *outputPath == "" {
-		return nil, fmt.Errorf("missing --out path")
+		return fmt.Errorf("missing --out path")
 	}
-	return &Opts{
-		InputPath:  *inputPath,
-		OutputPath: *outputPath,
-	}, nil
+	return nil
 }
 
 func fatal(err error) {
