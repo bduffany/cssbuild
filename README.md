@@ -28,7 +28,7 @@ go get -u github.com/bduffany/cssbuild
 # Convert a CSS module stylesheet to vanilla CSS.
 cssbuild -in src/styles.module.css -out dist/styles.css
 
-# The above command writes JS to `dist/styles.module.css.js` by default.
+# The above command writes JS to `dist/styles.module.css.js`.
 # You can control this with the `-js_out` flag:
 cssbuild -in src/styles.module.css -out dist/styles.css -js_out dist/styles.js
 
