@@ -12,6 +12,12 @@
   --x: 0;
 }
 
+.foo ~ div,
+.foo + #id,
+.foo > [data-some-attr^='.do-not-touch'] {
+  --x: 0;
+}
+
 .foo :global(.bar) {
   --x: 0;
 }
