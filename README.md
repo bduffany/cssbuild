@@ -18,11 +18,13 @@ A fast CSS compiler supporting a limited subset of
 
 ## More details
 
+- The map keys in the generated JS file can optionally be camelCase, even
+  if class names are kebab-case. This makes it easier to migrate to
+  CSS modules (no need to waste time rewriting existing CSS or break with
+  convention by requiring all CSS classes to be camelCase).
 - `:global` mode selector applies to the rules block, which allows
   referencing global animation names
 - Animation scoping supports legacy `-webkit-` prefixes
-- Optionally force all keys to be camelCase, even if class names are
-  kebab-case
 
 ## Thanks to
 
