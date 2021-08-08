@@ -1,6 +1,6 @@
 # cssbuild
 
-A fast CSS compiler supporting a basic subset of
+A fast CSS compiler supporting a limited subset of
 [CSS modules](https://github.com/css-modules/css-modules) functionality.
 
 ## Features
@@ -13,4 +13,3 @@ A fast CSS compiler supporting a basic subset of
 
 - Local `@import` and `@url`
 - Class composition
-
