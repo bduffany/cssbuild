@@ -268,6 +268,9 @@ func Transform(r io.Reader, w io.Writer, opts *TransformOpts) error {
 				buf = append(buf, text...)
 				buf = append(buf, ':', ' ')
 			}
+			if gt == css.CommentGrammar {
+				buf = append(buf, text...)
+			}
 
 			textStr := string(text)
 
@@ -275,7 +278,7 @@ func Transform(r io.Reader, w io.Writer, opts *TransformOpts) error {
 				buf = append(buf, transformAnimationProperty(values, blockScope, opts)...)
 			} else if gt == css.DeclarationGrammar && (textStr == "animation-name" || textStr == "-webkit-animation-name" || textStr == "-moz-animation-name") {
 				buf = append(buf, transformAnimationNameProperty(values, blockScope, opts)...)
-			} else if gt != css.EndAtRuleGrammar && gt != css.EndRulesetGrammar {
+			} else if gt != css.EndAtRuleGrammar && gt != css.EndRulesetGrammar && gt != css.CommentGrammar {
 				for _, val := range p.Values() {
 					buf = append(buf, val.Data...)
 				}
