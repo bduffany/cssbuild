@@ -2,6 +2,11 @@
   color: red;
 }
 
+/* comment */
+.foo__SUFFIX__ {
+  color: red;
+}
+
 .foo__SUFFIX__ .bar__SUFFIX__ .foo-bar__SUFFIX__ {
   --x: 0;
 }

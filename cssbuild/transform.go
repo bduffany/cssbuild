@@ -65,10 +65,10 @@ func (m *jsMappings) Write(w io.Writer, opts *TransformOpts) error {
 	if _, err := io.WriteString(w, fmt.Sprintf(jsHeaderTemplate, opts.JSModuleName)); err != nil {
 		return err
 	}
-	if err := writeExportedJSMap(w, opts, "classNames", m.ClassNames); err != nil {
+	if err := writeExportedJSMap(w, opts, "exports.classNames = {\n", 1, m.ClassNames); err != nil {
 		return err
 	}
-	if err := writeExportedJSMap(w, opts, "animationNames", m.AnimationNames); err != nil {
+	if err := writeExportedJSMap(w, opts, "exports.animationNames = {\n", 1, m.AnimationNames); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, jsFooterTemplate); err != nil {
@@ -78,14 +78,32 @@ func (m *jsMappings) Write(w io.Writer, opts *TransformOpts) error {
 	return nil
 }
 
-func writeExportedJSMap(w io.Writer, opts *TransformOpts, varName string, mapping map[string]struct{}) error {
+func (m *jsMappings) WriteTypeScript(w io.Writer, opts *TransformOpts) error {
+	if err := writeExportedJSMap(w, opts, "export const classNames = {\n", 0, m.ClassNames); err != nil {
+		return err
+	}
+	if err := writeExportedJSMap(w, opts, "export const animationNames = {\n", 0, m.AnimationNames); err != nil {
+		return err
+	}
+	return nil
+}
+
+func getIndent(level int) string {
+	out := ""
+	for i := 0; i < level; i++ {
+		out += "  "
+	}
+	return out
+}
+
+func writeExportedJSMap(w io.Writer, opts *TransformOpts, prefix string, indent int, mapping map[string]struct{}) error {
 	if opts.CamelCaseJSKeys {
 		if err := checkForConflicts(mapping); err != nil {
 			return err
 		}
 	}
 	classes := sortedKeys(mapping)
-	if _, err := io.WriteString(w, fmt.Sprintf("  exports.%s = {\n", varName)); err != nil {
+	if _, err := io.WriteString(w, getIndent(indent)+prefix); err != nil {
 		return err
 	}
 	for _, c := range classes {
@@ -94,11 +112,11 @@ func writeExportedJSMap(w io.Writer, opts *TransformOpts, varName string, mappin
 			key = kebabToCamel(key)
 		}
 		value := c + string(opts.Suffix)
-		if _, err := io.WriteString(w, fmt.Sprintf("    %s: '%s',\n", toJSKeyGrammar(key), value)); err != nil {
+		if _, err := io.WriteString(w, fmt.Sprintf("%s%s: '%s',\n", getIndent(indent+1), toJSKeyGrammar(key), value)); err != nil {
 			return err
 		}
 	}
-	if _, err := io.WriteString(w, "  };\n"); err != nil {
+	if _, err := io.WriteString(w, getIndent(indent)+"};\n"); err != nil {
 		return err
 	}
 	return nil
@@ -170,6 +188,10 @@ type TransformOpts struct {
 	// for the written JS module.
 	TSDeclarationWriter io.Writer
 
+	// TSWriter is an optional writer for writing TS mappings from the original
+	// CSS identifiers to suffixed ones.
+	TSWriter io.Writer
+
 	// Suffix is the suffix to append to all locally scoped identifiers
 	// in the transformed stylesheet. If empty, it will be set to an underscore
 	// followed by a randomly generated string.
@@ -224,13 +246,18 @@ func Transform(r io.Reader, w io.Writer, opts *TransformOpts) error {
 			// Write mappings file before returning.
 			if opts.JSWriter != nil {
 				if err := js.Write(opts.JSWriter, opts); err != nil {
-					return err
+					return fmt.Errorf("failed to write JS: %s", err)
 				}
 			}
 			if opts.TSDeclarationWriter != nil {
 				d := fmt.Sprintf(tsDeclarationTemplate, opts.JSModuleName)
 				if _, err := io.WriteString(opts.TSDeclarationWriter, d); err != nil {
-					return err
+					return fmt.Errorf("failed to write TS declaration: %s", err)
+				}
+			}
+			if opts.TSWriter != nil {
+				if err := js.WriteTypeScript(opts.TSWriter, opts); err != nil {
+					return fmt.Errorf("failed to write TS: %s", err)
 				}
 			}
 			return nil
@@ -240,7 +267,7 @@ func Transform(r io.Reader, w io.Writer, opts *TransformOpts) error {
 		// (decided by the state machine below).
 		if err != nil && err != io.EOF {
 			// TODO: include line number & filename in error
-			return err
+			return fmt.Errorf("parse error: %s", err)
 		}
 
 		if gt == css.QualifiedRuleGrammar || gt == css.BeginRulesetGrammar {
@@ -306,12 +333,12 @@ func Transform(r io.Reader, w io.Writer, opts *TransformOpts) error {
 
 		if len(indent) > 0 {
 			if _, err := w.Write(indent); err != nil {
-				return err
+				return fmt.Errorf("failed to write CSS: %s", err)
 			}
 		}
 		if len(buf) > 0 {
 			if _, err := w.Write(buf); err != nil {
-				return err
+				return fmt.Errorf("failed to write CSS: %s", err)
 			}
 			buf = nil
 		}

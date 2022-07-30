@@ -17,7 +17,8 @@ var (
 
 	jsModuleName      = flag.String("js_module_name", "", "JS module name. Required.")
 	jsOutputPath      = flag.String("js_out", "", "JS mapping output path. By default, it will be placed next to the output file, with the same basename as the input path.")
-	tsDeclarationPath = flag.String("ts_out", "", "TS declaration output path (*.d.ts). By default, it will be the same as the JS output path, with the \".js\" suffix replaced by \".d.ts\"")
+	tsDeclarationPath = flag.String("ts_declaration_out", "", "TS declaration output path (*.d.ts). By default, it will be the same as the JS output path, with the \".js\" suffix replaced by \".d.ts\"")
+	tsPath            = flag.String("ts_out", "", "TS mapping output path.")
 	camelCaseJSKeys   = flag.Bool("camel_case_js_keys", false, "Whether to convert kebab-case class names in the stylesheet to camelCase in the generated JS.")
 )
 
@@ -36,27 +37,42 @@ func main() {
 	if err != nil {
 		fatal(err)
 	}
-	jsPath := *jsOutputPath
-	if jsPath == "" {
-		jsOutDir := path.Dir(*outputPath)
-		inputCSSBase := path.Base(*inputPath)
-		jsPath = path.Join(jsOutDir, inputCSSBase+".js")
+	var js, tsd, ts io.WriteCloser
+
+	if *tsPath == "" {
+		jsPath := *jsOutputPath
+		if jsPath == "" {
+			jsOutDir := path.Dir(*outputPath)
+			inputCSSBase := path.Base(*inputPath)
+			jsPath = path.Join(jsOutDir, inputCSSBase+".js")
+		}
+		js, err = os.Create(jsPath)
+		if err != nil {
+			fatal(err)
+		}
+		defer js.Close()
+
+		tsDeclarationPath := *tsDeclarationPath
+		if tsDeclarationPath == "" {
+			tsDeclarationPath = strings.TrimSuffix(jsPath, ".js") + ".d.ts"
+		}
+		tsd, err = os.Create(tsDeclarationPath)
+		if err != nil {
+			fatal(err)
+		}
+		defer tsd.Close()
+	} else {
+		ts, err = os.Create(*tsPath)
+		if err != nil {
+			fatal(err)
+		}
+		defer ts.Close()
 	}
-	js, err := os.Create(jsPath)
-	if err != nil {
-		fatal(err)
-	}
-	tsPath := *tsDeclarationPath
-	if tsPath == "" {
-		tsPath = strings.TrimSuffix(jsPath, ".js") + ".d.ts"
-	}
-	ts, err := os.Create(tsPath)
-	if err != nil {
-		fatal(err)
-	}
+
 	opts := &cssbuild.TransformOpts{
 		JSWriter:            js,
-		TSDeclarationWriter: ts,
+		TSDeclarationWriter: tsd,
+		TSWriter:            ts,
 		JSModuleName:        *jsModuleName,
 		CamelCaseJSKeys:     *camelCaseJSKeys,
 	}
@@ -72,13 +88,19 @@ func validateFlags() error {
 	if *outputPath == "" {
 		return fmt.Errorf("missing output CSS path (`-out` flag)")
 	}
-	if *jsModuleName == "" {
+	if *jsModuleName == "" && *tsPath == "" {
 		return fmt.Errorf("missing JS module name (`-js_module_name` flag)")
+	}
+	if *tsDeclarationPath != "" && *tsPath != "" {
+		return fmt.Errorf("cannot specify both `-ts_declaration_out` flag and `-ts_out` flag")
+	}
+	if *jsOutputPath != "" && *tsPath != "" {
+		return fmt.Errorf("cannot specify both `-js_out` flag and `-ts_out` flag")
 	}
 	return nil
 }
 
 func fatal(err error) {
-	io.WriteString(os.Stderr, err.Error()+"\n")
+	io.WriteString(os.Stderr, "fatal: "+err.Error()+"\n")
 	os.Exit(1)
 }

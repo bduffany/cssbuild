@@ -324,7 +324,6 @@ func (p *Parser) parseAtRuleUnknown() GrammarType {
 }
 
 func (p *Parser) parseQualifiedRule() GrammarType {
-	dbg("parseQualifiedRule")
 	p.initBuf()
 	first := true
 	inAttrSel := false
