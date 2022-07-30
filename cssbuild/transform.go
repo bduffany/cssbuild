@@ -85,6 +85,9 @@ func (m *jsMappings) WriteTypeScript(w io.Writer, opts *TransformOpts) error {
 	if err := writeExportedJSMap(w, opts, "export const animationNames = {\n", 0, m.AnimationNames); err != nil {
 		return err
 	}
+	if _, err := io.WriteString(w, "export default classNames;\n"); err != nil {
+		return err
+	}
 	return nil
 }
 

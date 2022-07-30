@@ -7,3 +7,4 @@ export const classNames = {
 export const animationNames = {
   foo: 'foo__SUFFIX__',
 };
+export default classNames;
